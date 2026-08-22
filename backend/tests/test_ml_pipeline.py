@@ -26,6 +26,7 @@ def test_preprocessor_transforms_mixed_features() -> None:
     frame = _training_frame()
     transformed = build_preprocessor().fit_transform(frame[FEATURE_COLUMNS])
 
+    assert len(FEATURE_COLUMNS) == 22
     assert transformed.shape[0] == len(frame)
     assert transformed.shape[1] > len(FEATURE_COLUMNS)
 

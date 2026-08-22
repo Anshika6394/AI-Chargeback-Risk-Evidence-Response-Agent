@@ -20,11 +20,17 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
 
-from app.ml.features import DATASET_VERSION, FEATURE_COLUMNS, TARGET_COLUMN
+from app.ml.features import (
+    CATEGORICAL_FEATURE_COLUMNS,
+    DATASET_VERSION,
+    FEATURE_COLUMNS,
+    NUMERIC_FEATURE_COLUMNS,
+    TARGET_COLUMN,
+)
 
 RANDOM_SEED = 20260822
-NUMERIC_FEATURES = ["amount", "has_device"]
-CATEGORICAL_FEATURES = [column for column in FEATURE_COLUMNS if column not in NUMERIC_FEATURES]
+NUMERIC_FEATURES = NUMERIC_FEATURE_COLUMNS
+CATEGORICAL_FEATURES = CATEGORICAL_FEATURE_COLUMNS
 MODEL_VERSION = "chargeback-risk-v1"
 
 
