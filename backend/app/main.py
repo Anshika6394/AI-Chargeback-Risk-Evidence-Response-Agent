@@ -1,5 +1,8 @@
 """FastAPI application entry point."""
 
+from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,10 +12,15 @@ from app.core.errors import register_error_handlers
 from app.db.init_db import init_db
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    init_db()
+    yield
+
+
 def create_app() -> FastAPI:
-    """Create and configure the FastAPI application."""
     settings = get_settings()
-    app = FastAPI(title=settings.app_name, version="0.1.0")
+    app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -22,12 +30,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     register_error_handlers(app)
-
-    @app.on_event("startup")
-    def initialize_database() -> None:
-        """Initialize database tables for local/dev deployments."""
-        init_db()
-
     app.include_router(api_router)
     return app
 
