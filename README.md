@@ -2,7 +2,7 @@
 
 A synthetic/demo fintech risk-operations application for the Razorpay AI Builder Internship 2026 — Track 02: AI Risk Manager.
 
-## Current phase: Phase 3 — ML Training, Model Comparison & Risk Scoring
+## Current phase: Phase 5 — FastAPI Risk & Investigation Data APIs
 
 Earlier phases added the backend foundation for environment-based configuration, database wiring, ORM domain models, separate Pydantic schemas, consistent API error responses, and seed-data scaffolding. It does **not** include authentication, Gemini calls, the investigation agent, dashboard workflows, or autonomous financial actions.
 
@@ -153,8 +153,7 @@ npm run build
 
 - No authentication yet.
 - No Gemini investigation agent yet.
-- No final synthetic demo seed data yet.
-- No real or fake business metrics yet.
+- No Gemini investigation agent yet.
 - No financial actions of any kind.
 
 All future evidence and metrics must come from real tool/database/model output in later phases.
@@ -215,3 +214,26 @@ It writes these reproducible, machine-readable/auditable artifacts under `backen
 `predict_risk(..., top_n_factors=5)` now returns `model_derived_risk_factors`. Tree classifiers use their model-native feature importances and linear classifiers use coefficients, combined with the exact transformed input values. These factors are traceable to the feature schema and are deliberately separate from any future Gemini-generated narrative.
 
 All Phase 4 metrics and explanations are derived from the synthetic demo dataset and persisted scikit-learn pipeline; they are not production performance claims or LLM output.
+
+## Phase 5 — FastAPI Risk & Investigation Data APIs
+
+Phase 5 exposes the persisted ML model and synthetic investigation data through documented, versioned REST endpoints. Train the model before calling prediction or model-metadata endpoints, then seed the local development database:
+
+```bash
+cd backend
+python -m app.ml.train_model
+# Start the API in another terminal, then POST /api/v1/seed once in development.
+```
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /api/v1/risk/predict` | Validates model-ready features, runs the persisted quantitative model, and stores an audit prediction record. It is only a human-review recommendation and never performs a financial action. |
+| `GET /api/v1/transactions` | Paginated synthetic transaction list with customer, status, and currency filters. |
+| `GET /api/v1/transactions/{transaction_id}` | Database-backed transaction detail and related customer/merchant facts. |
+| `GET /api/v1/customers/{customer_id}/history` | Database-derived customer transaction aggregates and history. |
+| `GET /api/v1/customers/{customer_id}/disputes` | Synthetic dispute records stored in the database. |
+| `GET /api/v1/risk/summary` | Aggregate statistics calculated from stored transaction and prediction records. |
+| `GET /api/v1/model/metrics` | Actual persisted held-out evaluation JSON, not constants. |
+| `GET /api/v1/model/info` | Safe persisted model version and selection metadata. |
+
+Swagger documents requests, response contracts, and examples at <http://localhost:8000/docs>. The APIs intentionally expose no Gemini capability, model weights, training examples, or autonomous payment controls.
