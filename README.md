@@ -215,6 +215,14 @@ It writes these reproducible, machine-readable/auditable artifacts under `backen
 
 All Phase 4 metrics and explanations are derived from the synthetic demo dataset and persisted scikit-learn pipeline; they are not production performance claims or LLM output.
 
+### Phase 6: risk investigation cases and evidence traceability
+
+`POST /api/v1/cases` creates a human-review investigation case from an existing transaction's latest persisted ML prediction. It also captures deterministic evidence from only linked database records. `GET /api/v1/cases/{case_id}` returns the case and its audit history, `PATCH /api/v1/cases/{case_id}` updates the reviewer or advances the case through its validated workflow, and `GET /api/v1/cases/{case_id}/evidence` lists traceable evidence items.
+
+Each evidence item records a source table and source record ID. When a related record is absent, the API returns the exact factual content `Evidence unavailable` with an `EVIDENCE_UNAVAILABLE` verification status rather than inventing a claim. This phase does not call Gemini and cannot execute financial actions.
+
+Allowed status transitions are: `NEW → INVESTIGATING → READY_FOR_REVIEW → APPROVED|REJECTED → CLOSED`. Reviewer assignment is auditable independently of a status transition.
+
 ## Phase 5 — FastAPI Risk & Investigation Data APIs
 
 Phase 5 exposes the persisted ML model and synthetic investigation data through documented, versioned REST endpoints. Train the model before calling prediction or model-metadata endpoints, then seed the local development database:

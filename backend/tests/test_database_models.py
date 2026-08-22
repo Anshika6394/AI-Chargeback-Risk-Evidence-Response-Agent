@@ -21,6 +21,9 @@ def test_database_initializes_with_expected_tables_indexes_and_foreign_keys() ->
         "disputes",
         "merchants",
         "risk_predictions",
+        "risk_cases",
+        "risk_case_history",
+        "evidence_items",
         "transactions",
     }
 
