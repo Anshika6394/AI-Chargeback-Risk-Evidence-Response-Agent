@@ -37,7 +37,7 @@ def _response(case: RiskCase) -> RiskCaseResponse:
         case_id=case.case_id, transaction_id=case.transaction.transaction_id, prediction_id=case.prediction_id,
         risk_score=case.risk_score, risk_level=case.risk_level, prediction=case.prediction, status=case.status,
         assigned_reviewer=case.assigned_reviewer, created_at=case.created_at, updated_at=case.updated_at,
-        history=sorted(case.history_entries, key=lambda entry: (entry.occurred_at, entry.id)),
+        history=sorted(case.history_entries, key=lambda entry: entry.created_at),
     )
 
 
@@ -77,7 +77,7 @@ def update_case(case_id: SafeId, payload: RiskCaseUpdateRequest, db: Annotated[S
         case.status = payload.status
     if reviewer_changed:
         case.assigned_reviewer = payload.assigned_reviewer
-    db.add(RiskCaseHistory(risk_case_id=case.id, event_type="STATUS_CHANGED" if status_changed else "REVIEWER_ASSIGNED", from_status=previous_status if status_changed else None, to_status=case.status if status_changed else None, assigned_reviewer=case.assigned_reviewer))
+    db.add(RiskCaseHistory(risk_case_id=case.id, event_type="STATUS_CHANGED" if status_changed else "REVIEWER_ASSIGNED", from_status=previous_status if status_changed else None, to_status=payload.status if status_changed else None, assigned_reviewer=case.assigned_reviewer))
     db.commit()
     return _response(_case_or_404(db, case.case_id))
 
