@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./chargeback_risk.db"
     gemini_api_key: str | None = None
     backend_cors_origins: str = "http://localhost:5173"
+    ml_model_artifact_path: str = "artifacts/models/chargeback-risk-v1.joblib"
+    risk_low_threshold: int = 35
+    risk_high_threshold: int = 70
 
     @field_validator("database_url")
     @classmethod
@@ -29,6 +32,14 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL must be a SQLite or PostgreSQL-compatible SQLAlchemy URL")
         return value
 
+    @field_validator("risk_low_threshold", "risk_high_threshold")
+    @classmethod
+    def validate_risk_thresholds(cls, value: int) -> int:
+        """Ensure risk thresholds can map scores on a 0-100 scale."""
+        if not 0 <= value <= 100:
+            raise ValueError("Risk thresholds must be between 0 and 100")
+        return value
+
     @field_validator("backend_cors_origins")
     @classmethod
     def validate_cors_origins(cls, value: str) -> str:
@@ -37,6 +48,11 @@ class Settings(BaseSettings):
         if not origins:
             raise ValueError("BACKEND_CORS_ORIGINS must contain at least one origin")
         return value
+
+    def model_post_init(self, __context: object) -> None:
+        """Validate relative ordering for score thresholds after field parsing."""
+        if self.risk_low_threshold >= self.risk_high_threshold:
+            raise ValueError("RISK_LOW_THRESHOLD must be lower than RISK_HIGH_THRESHOLD")
 
     @property
     def cors_origins(self) -> list[str]:
