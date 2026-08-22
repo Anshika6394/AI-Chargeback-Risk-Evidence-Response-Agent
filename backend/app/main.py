@@ -1,28 +1,12 @@
 """FastAPI application entry point."""
 
-from functools import lru_cache
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.api.v1.router import api_router
-
-
-class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
-
-    model_config = SettingsConfigDict(env_file="../.env", env_file_encoding="utf-8", extra="ignore")
-
-    app_name: str = "AI Chargeback Risk & Evidence Response Agent"
-    app_env: str = "development"
-    backend_cors_origins: str = "http://localhost:5173"
-
-
-@lru_cache
-def get_settings() -> Settings:
-    """Return cached application settings."""
-    return Settings()
+from app.core.config import get_settings
+from app.core.errors import register_error_handlers
+from app.db.init_db import init_db
 
 
 def create_app() -> FastAPI:
@@ -30,14 +14,19 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version="0.1.0")
 
-    origins = [origin.strip() for origin in settings.backend_cors_origins.split(",") if origin.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
+    register_error_handlers(app)
+
+    @app.on_event("startup")
+    def initialize_database() -> None:
+        """Initialize database tables for local/dev deployments."""
+        init_db()
 
     app.include_router(api_router)
     return app
