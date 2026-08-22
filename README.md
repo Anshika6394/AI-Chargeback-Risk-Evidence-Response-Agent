@@ -180,6 +180,13 @@ cd backend
 python -m app.ml.train_model
 ```
 
+Install backend development dependencies before running the test suite:
+
+```bash
+cd backend
+python -m pip install -e '.[dev]'
+```
+
 Configurable ML environment variables:
 
 | Variable | Purpose | Default/example |
@@ -189,3 +196,22 @@ Configurable ML environment variables:
 | `RISK_HIGH_THRESHOLD` | Minimum 0–100 score for HIGH risk | `70` |
 
 The reusable prediction service is `app.ml.predict_risk(features, settings=None)`. It returns model probability, bounded 0–100 risk score, risk level (`LOW`, `MEDIUM`, `HIGH`), and model version. It does not call Gemini and does not execute financial actions.
+
+## Phase 4 — Held-Out Evaluation, Explainability & Model Registry
+
+Phase 4 evaluates the persisted validation-selected model on the untouched deterministic synthetic test split. The command below trains/selects using the training and validation splits, then performs one explicit held-out evaluation of that selected persisted artifact; test metrics do not affect model selection.
+
+```bash
+cd backend
+python -m app.ml.train_model
+```
+
+It writes these reproducible, machine-readable/auditable artifacts under `backend/artifacts/models/`:
+
+- `chargeback-risk-v1.evaluation.json` — actual Precision, Recall, F1, Accuracy, ROC-AUC, threshold, confusion matrix, support counts, class distribution, split provenance, and dataset fingerprint;
+- `chargeback-risk-v1.evaluation.md` — human-readable rendering of the same calculated results;
+- `chargeback-risk-v1.registry.json` — model version/type, feature schema, synthetic dataset metadata, metric snapshot, and absolute paths to the model, training metadata, and evaluation artifacts.
+
+`predict_risk(..., top_n_factors=5)` now returns `model_derived_risk_factors`. Tree classifiers use their model-native feature importances and linear classifiers use coefficients, combined with the exact transformed input values. These factors are traceable to the feature schema and are deliberately separate from any future Gemini-generated narrative.
+
+All Phase 4 metrics and explanations are derived from the synthetic demo dataset and persisted scikit-learn pipeline; they are not production performance claims or LLM output.

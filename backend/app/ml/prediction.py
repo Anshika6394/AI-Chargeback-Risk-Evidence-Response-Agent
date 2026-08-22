@@ -10,6 +10,7 @@ import joblib
 import pandas as pd
 
 from app.core.config import Settings, get_settings
+from app.ml.evaluation import RiskFactor, explain_prediction
 from app.ml.features import FEATURE_COLUMNS
 
 
@@ -21,6 +22,7 @@ class RiskPredictionResult:
     risk_score: int
     risk_level: str
     model_version: str
+    model_derived_risk_factors: tuple[RiskFactor, ...]
 
 
 def probability_to_score(probability: float) -> int:
@@ -45,8 +47,8 @@ def load_model(artifact_path: str | Path) -> Any:
     return joblib.load(path)
 
 
-def predict_risk(features: dict[str, Any], settings: Settings | None = None) -> RiskPredictionResult:
-    """Predict chargeback probability, risk score, and level from feature values."""
+def predict_risk(features: dict[str, Any], settings: Settings | None = None, top_n_factors: int = 5) -> RiskPredictionResult:
+    """Predict risk with model-derived factors; no LLM prose is included."""
     settings = settings or get_settings()
     row = {column: features.get(column) for column in FEATURE_COLUMNS}
     model = load_model(settings.ml_model_artifact_path)
@@ -57,4 +59,5 @@ def predict_risk(features: dict[str, Any], settings: Settings | None = None) -> 
         risk_score=score,
         risk_level=risk_level_for_score(score, settings.risk_low_threshold, settings.risk_high_threshold),
         model_version=Path(settings.ml_model_artifact_path).stem,
+        model_derived_risk_factors=tuple(explain_prediction(model, row, top_n=top_n_factors)),
     )

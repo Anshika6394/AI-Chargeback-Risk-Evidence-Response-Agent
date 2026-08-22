@@ -2,6 +2,7 @@
 
 from sqlalchemy.engine import Engine
 
+import app.models  # noqa: F401  # Register ORM mappings before creating metadata.
 from app.db.base import Base
 from app.db.session import engine as default_engine
 

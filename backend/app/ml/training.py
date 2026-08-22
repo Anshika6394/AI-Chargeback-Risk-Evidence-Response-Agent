@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -43,6 +44,12 @@ class TrainingResult:
     validation_metrics: dict[str, dict[str, Any]]
     artifact_path: Path
     metadata_path: Path
+
+
+def dataset_fingerprint(frame: pd.DataFrame) -> str:
+    """Return a stable digest for the exact synthetic dataset used in a run."""
+    serialized = frame[[*FEATURE_COLUMNS, TARGET_COLUMN]].to_csv(index=False, lineterminator="\n")
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
 def build_preprocessor() -> ColumnTransformer:
@@ -134,11 +141,13 @@ def train_and_persist(frame: pd.DataFrame, artifact_dir: Path) -> TrainingResult
         "model_version": MODEL_VERSION,
         "training_date": datetime.now(UTC).isoformat(),
         "dataset_version": DATASET_VERSION,
+        "dataset_fingerprint": dataset_fingerprint(frame),
         "feature_list": FEATURE_COLUMNS,
         "model_type": selected_model,
         "selection_criterion": "Highest validation recall; ties broken by validation F1 then ROC-AUC because chargeback misses are costlier.",
         "validation_metrics": validation_metrics,
-        "held_out_test_policy": "Test split is created stratified and not used for model selection in Phase 3.",
+        "split_policy": "Stratified 60/20/20 train/validation/test split using the recorded random seed.",
+        "held_out_test_policy": "Test split is created stratified and not used for model selection; Phase 4 evaluates the persisted selected artifact separately.",
         "random_seed": RANDOM_SEED,
     }
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
