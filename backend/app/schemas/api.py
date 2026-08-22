@@ -129,3 +129,57 @@ class ModelInfoResponse(BaseModel):
     feature_count: int
     selection_criterion: str
     held_out_test_policy: str
+
+
+CaseStatus = Literal["NEW", "INVESTIGATING", "READY_FOR_REVIEW", "APPROVED", "REJECTED", "CLOSED"]
+
+
+class RiskCaseCreateRequest(BaseModel):
+    """Create a human-review case from a transaction's latest audited ML prediction."""
+
+    transaction_id: SafeId
+    assigned_reviewer: Annotated[str | None, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] = None
+
+
+class RiskCaseUpdateRequest(BaseModel):
+    """Update assignment and/or advance a case through its permitted workflow."""
+
+    status: CaseStatus | None = None
+    assigned_reviewer: Annotated[str | None, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)] = None
+
+
+class EvidenceItemResponse(BaseModel):
+    id: str
+    evidence_type: str
+    source: str
+    source_id: str
+    factual_content: str
+    retrieved_at: datetime
+    verification_status: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RiskCaseHistoryResponse(BaseModel):
+    id: str
+    event_type: str
+    from_status: str | None
+    to_status: str | None
+    assigned_reviewer: str | None
+    occurred_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RiskCaseResponse(BaseModel):
+    case_id: str
+    transaction_id: str
+    prediction_id: str
+    risk_score: Decimal
+    risk_level: str
+    prediction: str
+    status: CaseStatus
+    assigned_reviewer: str | None
+    created_at: datetime
+    updated_at: datetime
+    history: list[RiskCaseHistoryResponse]

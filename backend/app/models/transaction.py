@@ -32,3 +32,4 @@ class Transaction(IdTimestampMixin, Base):
     device = relationship("Device", back_populates="transactions")
     disputes = relationship("Dispute", back_populates="transaction")
     risk_predictions = relationship("RiskPrediction", back_populates="transaction")
+    risk_cases = relationship("RiskCase", back_populates="transaction")
