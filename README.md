@@ -2,9 +2,9 @@
 
 A synthetic/demo fintech risk-operations application for the Razorpay AI Builder Internship 2026 — Track 02: AI Risk Manager.
 
-## Current phase: Phase 1 — Configuration, Database & Domain Foundation
+## Current phase: Phase 3 — ML Training, Model Comparison & Risk Scoring
 
-This phase adds the backend foundation for environment-based configuration, database wiring, ORM domain models, separate Pydantic schemas, consistent API error responses, and seed-data scaffolding. It does **not** include authentication, ML model training, Gemini calls, final demo data, or autonomous financial actions.
+Earlier phases added the backend foundation for environment-based configuration, database wiring, ORM domain models, separate Pydantic schemas, consistent API error responses, and seed-data scaffolding. It does **not** include authentication, Gemini calls, the investigation agent, dashboard workflows, or autonomous financial actions.
 
 All data in this repository is intended for synthetic/demo development only. Real secrets must stay in environment variables and must never be committed.
 
@@ -149,13 +149,43 @@ cd frontend
 npm run build
 ```
 
-## Phase 1 limitations
+## Current limitations
 
 - No authentication yet.
-- No ML risk model yet.
 - No Gemini investigation agent yet.
 - No final synthetic demo seed data yet.
 - No real or fake business metrics yet.
 - No financial actions of any kind.
 
 All future evidence and metrics must come from real tool/database/model output in later phases.
+
+## Phase 3 — ML Training, Model Comparison & Risk Scoring
+
+Phase 3 adds a backend-only machine-learning package under `backend/app/ml`. It trains on deterministic synthetic/demo data seeded from the SQLAlchemy models, labels chargeback risk from actual synthetic dispute rows, and keeps Gemini completely out of quantitative prediction.
+
+The training pipeline:
+
+- extracts numerical and categorical features from synthetic transactions, customers, merchants, and devices;
+- uses stratified train/validation/test splitting with a fixed seed;
+- keeps the held-out test split out of model selection;
+- preprocesses numerical values with scaling and categorical values with one-hot encoding;
+- compares Logistic Regression, Random Forest, and XGBoost using validation Precision, Recall, F1, Accuracy, ROC-AUC, and confusion matrix;
+- selects the final model by highest validation Recall, with F1 and ROC-AUC as tie-breakers because missed chargebacks are costlier than manual review;
+- persists preprocessing and model together as `backend/artifacts/models/chargeback-risk-v1.joblib` plus versioned metadata JSON.
+
+Train the model from the backend directory:
+
+```bash
+cd backend
+python -m app.ml.train_model
+```
+
+Configurable ML environment variables:
+
+| Variable | Purpose | Default/example |
+| --- | --- | --- |
+| `ML_MODEL_ARTIFACT_PATH` | Path to the persisted preprocessing+model artifact used by `predict_risk()` | `artifacts/models/chargeback-risk-v1.joblib` |
+| `RISK_LOW_THRESHOLD` | Minimum 0–100 score for MEDIUM risk | `35` |
+| `RISK_HIGH_THRESHOLD` | Minimum 0–100 score for HIGH risk | `70` |
+
+The reusable prediction service is `app.ml.predict_risk(features, settings=None)`. It returns model probability, bounded 0–100 risk score, risk level (`LOW`, `MEDIUM`, `HIGH`), and model version. It does not call Gemini and does not execute financial actions.
