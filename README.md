@@ -2,9 +2,9 @@
 
 A synthetic/demo fintech risk-operations application for the Razorpay AI Builder Internship 2026 — Track 02: AI Risk Manager.
 
-## Current phase: Phase 5 — FastAPI Risk & Investigation Data APIs
+## Current phase: Phase 7 — Gemini Tool-Using Investigation Agent
 
-Earlier phases added the backend foundation for environment-based configuration, database wiring, ORM domain models, separate Pydantic schemas, consistent API error responses, and seed-data scaffolding. It does **not** include authentication, Gemini calls, the investigation agent, dashboard workflows, or autonomous financial actions.
+Earlier phases added the backend foundation for environment-based configuration, database wiring, ORM domain models, separate Pydantic schemas, consistent API error responses, and seed-data scaffolding. Phase 7 adds a backend-only, tool-using Gemini investigation layer; it does **not** include authentication, dashboard workflows, or autonomous financial actions.
 
 All data in this repository is intended for synthetic/demo development only. Real secrets must stay in environment variables and must never be committed.
 
@@ -61,7 +61,9 @@ Supported backend environment variables:
 | `APP_NAME` | FastAPI application title | `AI Chargeback Risk & Evidence Response Agent` |
 | `APP_ENV` | Runtime environment; must be `development`, `test`, or `production` | `development` |
 | `DATABASE_URL` | SQLAlchemy database URL. SQLite is used for local development; PostgreSQL-compatible URLs are supported for later deployment. | `sqlite:///./chargeback_risk.db` |
-| `GEMINI_API_KEY` | Backend-only Gemini key reserved for later phases. Phase 1 does not call Gemini. | empty |
+| `GEMINI_API_KEY` | Backend-only Gemini key used only by the Phase 7 investigation service. | empty |
+| `GEMINI_MODEL` | Backend-only Gemini model used for controlled investigations. | `gemini-2.5-flash` |
+| `GEMINI_TIMEOUT_SECONDS` | Maximum duration for a Gemini request. | `20` |
 | `BACKEND_CORS_ORIGINS` | Comma-separated allowed frontend origins | `http://localhost:5173` |
 | `VITE_API_BASE_URL` | Frontend development API base URL | `http://localhost:8000` |
 
@@ -245,3 +247,11 @@ python -m app.ml.train_model
 | `GET /api/v1/model/info` | Safe persisted model version and selection metadata. |
 
 Swagger documents requests, response contracts, and examples at <http://localhost:8000/docs>. The APIs intentionally expose no Gemini capability, model weights, training examples, or autonomous payment controls.
+
+## Phase 7 — Gemini Tool-Using Investigation Agent
+
+`POST /api/v1/cases/{case_id}/investigate` invokes Gemini only from the backend to synthesize an existing case's database-grounded evidence. The independently persisted ML prediction remains the sole quantitative risk signal and continues to work when Gemini is unavailable.
+
+The agent can call only these allowlisted backend tools: `get_transaction`, `get_customer_history`, `get_previous_disputes`, `get_device_history`, `get_related_transactions`, `get_merchant_policy`, `create_evidence_report`, and `recommend_action`. Tool names outside this list are rejected. The agent must return a Pydantic-validated JSON result with a human-review-only recommendation, and every cited evidence ID must have been returned by an executed tool. The persisted `agent_investigations` record stores the model name, tool-call trace, cited evidence references, and validated response. This is synthetic/demo functionality only; it never executes refunds, reversals, transfers, or account changes.
+
+If `GEMINI_API_KEY` is absent or Gemini fails/times out, the investigation endpoint returns a controlled HTTP 503 response. The ML prediction endpoint does not depend on Gemini configuration or availability.
