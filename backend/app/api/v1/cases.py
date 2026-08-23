@@ -7,11 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_db
-from app.models.risk_case import RiskCase, RiskCaseHistory
+from app.models.risk_case import AgentInvestigation, RiskCase, RiskCaseHistory
 from app.models.risk_prediction import RiskPrediction
 from app.models.transaction import Transaction
-from app.schemas.api import EvidenceItemResponse, RiskCaseCreateRequest, RiskCaseResponse, RiskCaseUpdateRequest, SafeId
+from app.schemas.api import EvidenceItemResponse, InvestigationResponse, RiskCaseCreateRequest, RiskCaseResponse, RiskCaseUpdateRequest, SafeId
 from app.services.evidence_builder import build_evidence
+from app.services.gemini_agent import GeminiAgentError, GeminiInvestigationAgent, serialize_investigation
+from app.core.config import Settings, get_settings
 
 router = APIRouter(prefix="/cases", tags=["risk cases"])
 
@@ -86,3 +88,28 @@ def update_case(case_id: SafeId, payload: RiskCaseUpdateRequest, db: Annotated[S
 def list_evidence(case_id: SafeId, db: Annotated[Session, Depends(get_db)]) -> list[EvidenceItemResponse]:
     case = _case_or_404(db, case_id)
     return [EvidenceItemResponse.model_validate(item) for item in sorted(case.evidence_items, key=lambda item: (item.retrieved_at, item.id))]
+
+
+@router.post("/{case_id}/investigate", response_model=InvestigationResponse, summary="Run a controlled Gemini investigation for a risk case")
+def investigate_case(
+    case_id: SafeId,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> InvestigationResponse:
+    """Invoke Gemini only as a bounded evidence synthesizer; ML prediction remains independent."""
+    case = _case_or_404(db, case_id)
+    try:
+        result, tool_trace = GeminiInvestigationAgent(settings).investigate(case, db)
+    except GeminiAgentError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    tool_calls_json, evidence_references_json, result_json = serialize_investigation(result, tool_trace)
+    db.add(AgentInvestigation(
+        risk_case_id=case.id,
+        model_name=settings.gemini_model,
+        tool_calls_json=tool_calls_json,
+        evidence_references_json=evidence_references_json,
+        result_json=result_json,
+    ))
+    db.add(RiskCaseHistory(risk_case_id=case.id, event_type="GEMINI_INVESTIGATION_COMPLETED"))
+    db.commit()
+    return result

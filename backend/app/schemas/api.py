@@ -183,3 +183,14 @@ class RiskCaseResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     history: list[RiskCaseHistoryResponse]
+
+
+class InvestigationResponse(BaseModel):
+    """Validated, human-review-only investigation output."""
+
+    risk_summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4_000)]
+    evidence_references: list[SafeId] = Field(min_length=1, max_length=100)
+    risk_factors: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1_000)]] = Field(min_length=1, max_length=30)
+    recommendation: Literal["MANUAL_REVIEW", "GATHER_MORE_EVIDENCE", "CONTEST_DISPUTE"]
+    confidence: float = Field(ge=0, le=1)
+    requires_human_review: Literal[True]

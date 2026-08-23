@@ -33,6 +33,7 @@ class RiskCase(IdTimestampMixin, Base):
     prediction_record = relationship("RiskPrediction")
     evidence_items = relationship("EvidenceItem", back_populates="risk_case", cascade="all, delete-orphan")
     history_entries = relationship("RiskCaseHistory", back_populates="risk_case", cascade="all, delete-orphan")
+    investigations = relationship("AgentInvestigation", back_populates="risk_case", cascade="all, delete-orphan")
 
 
 class EvidenceItem(IdTimestampMixin, Base):
@@ -66,3 +67,18 @@ class RiskCaseHistory(IdTimestampMixin, Base):
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     risk_case = relationship("RiskCase", back_populates="history_entries")
+
+
+class AgentInvestigation(IdTimestampMixin, Base):
+    """Auditable Gemini investigation output and controlled tool-call trace."""
+
+    __tablename__ = "agent_investigations"
+    __table_args__ = (Index("ix_agent_investigations_risk_case_id", "risk_case_id"),)
+
+    risk_case_id: Mapped[str] = mapped_column(ForeignKey("risk_cases.id"), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    tool_calls_json: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_references_json: Mapped[str] = mapped_column(Text, nullable=False)
+    result_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+    risk_case = relationship("RiskCase", back_populates="investigations")

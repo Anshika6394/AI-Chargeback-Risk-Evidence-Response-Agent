@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     app_env: Literal["development", "test", "production"] = "development"
     database_url: str = "sqlite:///./chargeback_risk.db"
     gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_timeout_seconds: int = 20
     backend_cors_origins: str = "http://localhost:5173"
     ml_model_artifact_path: str = "artifacts/models/chargeback-risk-v1.joblib"
     risk_low_threshold: int = 35
@@ -38,6 +40,22 @@ class Settings(BaseSettings):
         """Ensure risk thresholds can map scores on a 0-100 scale."""
         if not 0 <= value <= 100:
             raise ValueError("Risk thresholds must be between 0 and 100")
+        return value
+
+    @field_validator("gemini_model")
+    @classmethod
+    def validate_gemini_model(cls, value: str) -> str:
+        """Require an explicit non-empty Gemini model name."""
+        if not value.strip():
+            raise ValueError("GEMINI_MODEL must not be empty")
+        return value.strip()
+
+    @field_validator("gemini_timeout_seconds")
+    @classmethod
+    def validate_gemini_timeout(cls, value: int) -> int:
+        """Keep external LLM calls bounded."""
+        if not 1 <= value <= 120:
+            raise ValueError("GEMINI_TIMEOUT_SECONDS must be between 1 and 120")
         return value
 
     @field_validator("backend_cors_origins")
