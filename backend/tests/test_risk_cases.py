@@ -43,3 +43,10 @@ def test_case_status_transitions_are_validated_and_audited(api_client: TestClien
     assert investigating.status_code == 200
     assert investigating.json()["status"] == "INVESTIGATING"
     assert investigating.json()["history"][-1]["from_status"] == "NEW"
+
+
+def test_case_creation_is_idempotent_for_latest_prediction(api_client: TestClient) -> None:
+    first = _create_case(api_client)
+    second = api_client.post("/api/v1/cases", json={"transaction_id": first["transaction_id"]})
+    assert second.status_code == 201
+    assert second.json()["case_id"] == first["case_id"]

@@ -3,12 +3,12 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.models.transaction import Transaction
-from app.schemas.api import PageResponse, SafeId, TransactionDetailResponse, TransactionListItem
+from app.schemas.api import PageResponse, SafeId, SortDirection, TransactionDetailResponse, TransactionListItem, TransactionSortField
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -21,14 +21,22 @@ def list_transactions(
     customer_id: SafeId | None = None,
     status_filter: Annotated[str | None, Query(alias="status", min_length=1, max_length=40)] = None,
     currency: Annotated[str | None, Query(min_length=3, max_length=3)] = None,
+    search: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
+    sort_by: TransactionSortField = "created_at",
+    sort_dir: SortDirection = "desc",
 ) -> PageResponse:
-    """Return a paginated, filtered list sourced only from the synthetic database."""
+    """Return a searchable, paginated, filtered list sourced only from the synthetic database."""
     filters = []
     if customer_id: filters.append(Transaction.customer_id == customer_id)
     if status_filter: filters.append(Transaction.status == status_filter)
     if currency: filters.append(Transaction.currency == currency.upper())
+    if search:
+        pattern = f"%{search.strip()}%"
+        filters.append(or_(Transaction.transaction_id.ilike(pattern), Transaction.customer_id.ilike(pattern), Transaction.merchant_id.ilike(pattern), Transaction.status.ilike(pattern)))
     total = db.scalar(select(func.count()).select_from(Transaction).where(*filters)) or 0
-    rows = db.scalars(select(Transaction).where(*filters).order_by(Transaction.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
+    sort_column = getattr(Transaction, sort_by)
+    ordering = asc(sort_column) if sort_dir == "asc" else desc(sort_column)
+    rows = db.scalars(select(Transaction).where(*filters).order_by(ordering, Transaction.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
     return PageResponse(items=[TransactionListItem.model_validate(row) for row in rows], page=page, page_size=page_size, total=total)
 
 

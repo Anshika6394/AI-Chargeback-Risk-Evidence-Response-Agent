@@ -1,5 +1,7 @@
 """Pydantic contracts for the documented Phase 5 REST API."""
 
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal
@@ -74,6 +76,10 @@ class PageResponse(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+TransactionSortField = Literal["created_at", "amount", "status", "currency"]
+SortDirection = Literal["asc", "desc"]
 
 
 class TransactionDetailResponse(TransactionListItem):
@@ -217,6 +223,20 @@ class RiskCaseHistoryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AgentToolCallResponse(BaseModel):
+    tool_name: str
+    arguments: dict[str, object]
+    evidence_references: list[str]
+
+
+class PersistedInvestigationResponse(BaseModel):
+    model_name: str
+    tool_calls: list[AgentToolCallResponse]
+    evidence_references: list[str]
+    result: InvestigationResponse
+    created_at: datetime
+
+
 class RiskCaseResponse(BaseModel):
     case_id: str
     transaction_id: str
@@ -229,6 +249,9 @@ class RiskCaseResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     history: list[RiskCaseHistoryResponse]
+    latest_investigation: PersistedInvestigationResponse | None = None
+    latest_evidence_package: EvidencePackageResponse | None = None
+    latest_recommendation: RecommendationResponse | None = None
 
 
 class InvestigationResponse(BaseModel):

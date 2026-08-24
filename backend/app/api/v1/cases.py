@@ -1,5 +1,6 @@
 """Human-review risk investigation case endpoints; no LLM or financial actions."""
 
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,7 +11,7 @@ from app.db.session import get_db
 from app.models.risk_case import AgentInvestigation, EvidencePackage, RiskCase, RiskCaseHistory
 from app.models.risk_prediction import RiskPrediction
 from app.models.transaction import Transaction
-from app.schemas.api import EvidenceItemResponse, EvidencePackageResponse, InvestigationResponse, RecommendationResponse, RiskCaseCreateRequest, RiskCaseResponse, RiskCaseUpdateRequest, SafeId
+from app.schemas.api import EvidenceItemResponse, EvidencePackageResponse, InvestigationResponse, PersistedInvestigationResponse, RecommendationResponse, RiskCaseCreateRequest, RiskCaseResponse, RiskCaseUpdateRequest, SafeId
 from app.services.evidence_builder import build_evidence
 from app.services.gemini_agent import GeminiAgentError, GeminiInvestigationAgent, serialize_investigation
 from app.services.response_builder import build_evidence_package, build_recommendation, evidence_package_response, recommendation_response
@@ -29,18 +30,36 @@ ALLOWED_STATUS_TRANSITIONS: dict[str, set[str]] = {
 
 
 def _case_or_404(db: Session, case_id: str) -> RiskCase:
-    case = db.scalar(select(RiskCase).options(selectinload(RiskCase.history_entries)).where(RiskCase.case_id == case_id))
+    case = db.scalar(select(RiskCase).options(selectinload(RiskCase.history_entries), selectinload(RiskCase.investigations), selectinload(RiskCase.evidence_packages), selectinload(RiskCase.recommendations)).where(RiskCase.case_id == case_id))
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Risk case not found")
     return case
 
 
+def _latest_investigation(case: RiskCase) -> PersistedInvestigationResponse | None:
+    latest = max(case.investigations, key=lambda row: row.created_at, default=None)
+    if latest is None:
+        return None
+    return PersistedInvestigationResponse(
+        model_name=latest.model_name,
+        tool_calls=json.loads(latest.tool_calls_json),
+        evidence_references=json.loads(latest.evidence_references_json),
+        result=InvestigationResponse.model_validate_json(latest.result_json),
+        created_at=latest.created_at,
+    )
+
+
 def _response(case: RiskCase) -> RiskCaseResponse:
+    latest_package = max(case.evidence_packages, key=lambda row: row.version, default=None)
+    latest_recommendation = max(case.recommendations, key=lambda row: row.version, default=None)
     return RiskCaseResponse(
         case_id=case.case_id, transaction_id=case.transaction.transaction_id, prediction_id=case.prediction_id,
         risk_score=case.risk_score, risk_level=case.risk_level, prediction=case.prediction, status=case.status,
         assigned_reviewer=case.assigned_reviewer, created_at=case.created_at, updated_at=case.updated_at,
         history=sorted(case.history_entries, key=lambda entry: entry.created_at),
+        latest_investigation=_latest_investigation(case),
+        latest_evidence_package=evidence_package_response(case, latest_package) if latest_package else None,
+        latest_recommendation=recommendation_response(case, latest_recommendation) if latest_recommendation else None,
     )
 
 
@@ -52,6 +71,9 @@ def create_case(payload: RiskCaseCreateRequest, db: Annotated[Session, Depends(g
     prediction = db.scalar(select(RiskPrediction).where(RiskPrediction.transaction_id == transaction.id).order_by(RiskPrediction.created_at.desc()))
     if prediction is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An audited risk prediction is required before creating a risk case")
+    existing_case = db.scalar(select(RiskCase).where(RiskCase.transaction_id == transaction.id, RiskCase.prediction_id == prediction.id).order_by(RiskCase.created_at.desc()))
+    if existing_case is not None:
+        return _response(_case_or_404(db, existing_case.case_id))
     case = RiskCase(transaction_id=transaction.id, prediction_id=prediction.id, risk_score=prediction.risk_score, risk_level=prediction.risk_band, prediction="CHARGEBACK_RISK", assigned_reviewer=payload.assigned_reviewer)
     db.add(case)
     db.flush()
