@@ -7,12 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_db
-from app.models.risk_case import AgentInvestigation, RiskCase, RiskCaseHistory
+from app.models.risk_case import AgentInvestigation, EvidencePackage, RiskCase, RiskCaseHistory
 from app.models.risk_prediction import RiskPrediction
 from app.models.transaction import Transaction
-from app.schemas.api import EvidenceItemResponse, InvestigationResponse, RiskCaseCreateRequest, RiskCaseResponse, RiskCaseUpdateRequest, SafeId
+from app.schemas.api import EvidenceItemResponse, EvidencePackageResponse, InvestigationResponse, RecommendationResponse, RiskCaseCreateRequest, RiskCaseResponse, RiskCaseUpdateRequest, SafeId
 from app.services.evidence_builder import build_evidence
 from app.services.gemini_agent import GeminiAgentError, GeminiInvestigationAgent, serialize_investigation
+from app.services.response_builder import build_evidence_package, build_recommendation, evidence_package_response, recommendation_response
 from app.core.config import Settings, get_settings
 
 router = APIRouter(prefix="/cases", tags=["risk cases"])
@@ -98,6 +99,8 @@ def investigate_case(
 ) -> InvestigationResponse:
     """Invoke Gemini only as a bounded evidence synthesizer; ML prediction remains independent."""
     case = _case_or_404(db, case_id)
+    if case.status != "NEW":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Investigation can only start from NEW status")
     try:
         result, tool_trace = GeminiInvestigationAgent(settings).investigate(case, db)
     except GeminiAgentError as exc:
@@ -111,5 +114,44 @@ def investigate_case(
         result_json=result_json,
     ))
     db.add(RiskCaseHistory(risk_case_id=case.id, event_type="GEMINI_INVESTIGATION_COMPLETED"))
+    case.status = "INVESTIGATING"
+    db.add(RiskCaseHistory(risk_case_id=case.id, event_type="STATUS_CHANGED", from_status="NEW", to_status="INVESTIGATING", assigned_reviewer=case.assigned_reviewer))
     db.commit()
     return result
+
+
+@router.post("/{case_id}/evidence", response_model=EvidencePackageResponse, status_code=status.HTTP_201_CREATED, summary="Generate a versioned, database-traceable evidence package")
+def generate_evidence_package(case_id: SafeId, db: Annotated[Session, Depends(get_db)]) -> EvidencePackageResponse:
+    """Create a fresh reviewer package from DB facts; regeneration is allowed while investigating."""
+    case = _case_or_404(db, case_id)
+    if case.status != "INVESTIGATING":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Evidence packages can only be generated while a case is INVESTIGATING")
+    try:
+        package = build_evidence_package(case, db)
+        db.flush()
+        db.add(RiskCaseHistory(risk_case_id=case.id, event_type="EVIDENCE_PACKAGE_GENERATED"))
+        db.commit()
+        db.refresh(package)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return evidence_package_response(case, package)
+
+
+@router.post("/{case_id}/recommendation", response_model=RecommendationResponse, status_code=status.HTTP_201_CREATED, summary="Generate a bounded recommendation requiring human approval")
+def generate_recommendation(case_id: SafeId, db: Annotated[Session, Depends(get_db)]) -> RecommendationResponse:
+    """Persist a recommendation only; this endpoint has no payment or account action path."""
+    case = _case_or_404(db, case_id)
+    if case.status != "INVESTIGATING":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Recommendations can only be generated while a case is INVESTIGATING")
+    package = db.scalar(
+        select(EvidencePackage).where(EvidencePackage.risk_case_id == case.id).order_by(EvidencePackage.version.desc())
+    )
+    if package is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Generate an evidence package before requesting a recommendation")
+    recommendation = build_recommendation(case, package, db)
+    db.flush()
+    db.add(RiskCaseHistory(risk_case_id=case.id, event_type="RECOMMENDATION_GENERATED"))
+    db.commit()
+    db.refresh(recommendation)
+    return recommendation_response(case, recommendation)

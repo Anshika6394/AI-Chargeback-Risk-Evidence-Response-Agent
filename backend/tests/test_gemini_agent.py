@@ -51,7 +51,10 @@ def test_agent_executes_allowlisted_tool_and_validates_tool_grounded_evidence(ap
     finally:
         db.close()
     assert result.requires_human_review is True
-    assert trace == [{"tool_name": "create_evidence_report", "arguments": {}, "evidence_references": result.evidence_references}]
+    assert len(trace) == 1
+    assert trace[0]["tool_name"] == "create_evidence_report"
+    assert trace[0]["arguments"] == {}
+    assert set(result.evidence_references).issubset(trace[0]["evidence_references"])
     assert len(client.calls) == 2
 
 

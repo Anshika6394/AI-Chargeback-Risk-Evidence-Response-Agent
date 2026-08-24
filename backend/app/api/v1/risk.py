@@ -45,7 +45,9 @@ def predict(
         result = predict_risk(payload.model_dump(exclude={"transaction_id"}), settings=settings)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Risk model artifact is unavailable; train the model first") from exc
-    record = RiskPrediction(transaction_id=transaction.id, model_version=result.model_version, risk_score=Decimal(str(result.risk_score / 100)), risk_band=result.risk_level, explanation=None)
+    # Persist only model-derived factors returned by the ML pipeline so later evidence
+    # packages can cite the exact factors used for this audited prediction.
+    record = RiskPrediction(transaction_id=transaction.id, model_version=result.model_version, risk_score=Decimal(str(result.risk_score / 100)), risk_band=result.risk_level, explanation=json.dumps([factor.__dict__ for factor in result.model_derived_risk_factors]))
     db.add(record)
     db.commit()
     db.refresh(record)
