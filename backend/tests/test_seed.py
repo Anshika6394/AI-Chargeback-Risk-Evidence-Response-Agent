@@ -67,3 +67,33 @@ def test_seed_risk_patterns_include_disputed_transactions(tmp_path: Path) -> Non
     assert response.status_code == 200
     counts = response.json()["counts"]
     assert counts["disputes"] >= 10
+
+
+def test_seed_includes_curated_phase13_demo_transactions(tmp_path: Path) -> None:
+    client = make_client(tmp_path)
+    response = client.post("/api/v1/seed")
+    assert response.status_code == 200
+
+    for transaction_id in [
+        "TX-DEMO-LOW-001",
+        "TX-DEMO-MED-001",
+        "TX-DEMO-HIGH-001",
+        "TX-DEMO-REPEAT-001",
+        "TX-DEMO-001",
+    ]:
+        detail = client.get(f"/api/v1/transactions/{transaction_id}")
+        assert detail.status_code == 200
+        assert detail.json()["transaction_id"] == transaction_id
+
+
+def test_hero_demo_transaction_has_repeat_dispute_context(tmp_path: Path) -> None:
+    client = make_client(tmp_path)
+    response = client.post("/api/v1/seed")
+    assert response.status_code == 200
+
+    hero = client.get("/api/v1/transactions/TX-DEMO-001")
+    assert hero.status_code == 200
+    body = hero.json()
+    assert body["amount"] == "1240.00"
+    assert body["status"] == "failed"
+    assert body["disputes_count"] == 1

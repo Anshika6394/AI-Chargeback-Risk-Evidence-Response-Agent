@@ -66,7 +66,7 @@ def test_risk_prediction_is_model_backed_and_audited(api_client: TestClient) -> 
 
 def test_data_routes_metrics_metadata_validation_and_openapi(api_client: TestClient) -> None:
     transactions = api_client.get("/api/v1/transactions?page=1&page_size=2")
-    assert transactions.status_code == 200 and transactions.json()["total"] == 260
+    assert transactions.status_code == 200 and transactions.json()["total"] == 267
     first = transactions.json()["items"][0]
     detail = api_client.get(f"/api/v1/transactions/{first['transaction_id']}")
     assert detail.status_code == 200 and detail.json()["customer_email"].endswith("synthetic.example.test")
