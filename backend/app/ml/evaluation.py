@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score
 
-from app.ml.features import DATASET_VERSION, FEATURE_COLUMNS, TARGET_COLUMN
+from app.ml.features import DATASET_VERSION, FEATURE_COLUMNS
 from app.ml.training import RANDOM_SEED, dataset_fingerprint, split_dataset
 
 

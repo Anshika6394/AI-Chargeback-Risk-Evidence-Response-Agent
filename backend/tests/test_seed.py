@@ -1,6 +1,5 @@
 """Tests for deterministic synthetic data seeding."""
 
-from collections.abc import Generator
 from pathlib import Path
 
 import pytest

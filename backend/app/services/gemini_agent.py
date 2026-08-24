@@ -8,6 +8,8 @@ it is saved or returned.
 import json
 import importlib
 import importlib.util
+import logging
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -23,6 +25,7 @@ from app.models.transaction import Transaction
 from app.schemas.api import InvestigationResponse
 
 MAX_TOOL_ROUNDS = 8
+logger = logging.getLogger("app.gemini")
 
 TOOL_DECLARATIONS = [
     {"name": "get_transaction", "description": "Retrieve the case transaction from the synthetic database.", "parameters": {"type": "OBJECT", "properties": {}, "required": []}},
@@ -98,14 +101,23 @@ class GeminiInvestigationAgent:
         raise GeminiAgentResponseInvalid("Gemini exceeded the maximum permitted tool-call rounds")
 
     def _generate_content(self, contents: list[Any]) -> Any:
-        try:
-            return self.client.models.generate_content(
-                model=self.settings.gemini_model,
-                contents=contents,
-                config={"tools": [{"function_declarations": TOOL_DECLARATIONS}]} if self.types is None else self.types.GenerateContentConfig(tools=[{"function_declarations": TOOL_DECLARATIONS}]),
-            )
-        except Exception as exc:  # Provider/network failures must not affect ML predictions.
-            raise GeminiAgentUnavailable("Gemini investigation is temporarily unavailable") from exc
+        attempts = self.settings.gemini_max_retries + 1
+        for attempt in range(1, attempts + 1):
+            try:
+                return self.client.models.generate_content(
+                    model=self.settings.gemini_model,
+                    contents=contents,
+                    config={"tools": [{"function_declarations": TOOL_DECLARATIONS}]} if self.types is None else self.types.GenerateContentConfig(tools=[{"function_declarations": TOOL_DECLARATIONS}]),
+                )
+            except Exception as exc:  # Provider/network failures must not affect ML predictions.
+                logger.warning(
+                    "gemini_generate_content_failed",
+                    extra={"attempt": attempt, "max_attempts": attempts, "model": self.settings.gemini_model},
+                )
+                if attempt >= attempts:
+                    raise GeminiAgentUnavailable("Gemini investigation is temporarily unavailable") from exc
+                time.sleep(min(0.25 * attempt, 1.0))
+        raise GeminiAgentUnavailable("Gemini investigation is temporarily unavailable")
 
     @staticmethod
     def _function_calls(response: Any) -> list[tuple[str, dict[str, Any]]]:

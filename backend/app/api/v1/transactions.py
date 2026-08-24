@@ -27,9 +27,12 @@ def list_transactions(
 ) -> PageResponse:
     """Return a searchable, paginated, filtered list sourced only from the synthetic database."""
     filters = []
-    if customer_id: filters.append(Transaction.customer_id == customer_id)
-    if status_filter: filters.append(Transaction.status == status_filter)
-    if currency: filters.append(Transaction.currency == currency.upper())
+    if customer_id:
+        filters.append(Transaction.customer_id == customer_id)
+    if status_filter:
+        filters.append(Transaction.status == status_filter)
+    if currency:
+        filters.append(Transaction.currency == currency.upper())
     if search:
         pattern = f"%{search.strip()}%"
         filters.append(or_(Transaction.transaction_id.ilike(pattern), Transaction.customer_id.ilike(pattern), Transaction.merchant_id.ilike(pattern), Transaction.status.ilike(pattern)))
@@ -44,5 +47,6 @@ def list_transactions(
 def get_transaction(transaction_id: SafeId, db: Annotated[Session, Depends(get_db)]) -> TransactionDetailResponse:
     """Return transaction detail with directly related database records, never generated evidence."""
     row = db.scalar(select(Transaction).options(joinedload(Transaction.customer), joinedload(Transaction.merchant), joinedload(Transaction.disputes)).where(Transaction.transaction_id == transaction_id))
-    if row is None: raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
     return TransactionDetailResponse(id=row.id, transaction_id=row.transaction_id, customer_id=row.customer_id, merchant_id=row.merchant_id, device_id=row.device_id, amount=row.amount, currency=row.currency, status=row.status, created_at=row.created_at, updated_at=row.updated_at, customer_email=row.customer.email, customer_name=row.customer.full_name, merchant_name=row.merchant.name, merchant_category=row.merchant.category, disputes_count=len(row.disputes))
