@@ -53,6 +53,13 @@ def test_risk_prediction_is_model_backed_and_audited(api_client: TestClient) -> 
     assert body["model_derived_risk_factors"]
     summary = api_client.get("/api/v1/risk/summary").json()
     assert summary["total_predictions"] == 1
+    dashboard = api_client.get("/api/v1/risk/dashboard")
+    assert dashboard.status_code == 200
+    dashboard_body = dashboard.json()
+    assert dashboard_body["synthetic_data"] is True
+    assert dashboard_body["kpis"]["total_transactions"] == summary["total_transactions"]
+    assert dashboard_body["kpis"]["predicted_chargebacks"] == summary["total_predictions"]
+    assert sum(point["count"] for point in dashboard_body["risk_score_histogram"]) == summary["total_predictions"]
 
 
 def test_data_routes_metrics_metadata_validation_and_openapi(api_client: TestClient) -> None:
@@ -66,6 +73,8 @@ def test_data_routes_metrics_metadata_validation_and_openapi(api_client: TestCli
     assert api_client.get(f"/api/v1/customers/{customer_id}/disputes").status_code == 200
     metrics = api_client.get("/api/v1/model/metrics")
     assert metrics.status_code == 200 and "confusion_matrix" in metrics.json()["metrics"]
+    dashboard_metrics = api_client.get("/api/v1/risk/dashboard").json()["model_metrics"]
+    assert dashboard_metrics["metrics"] == metrics.json()["metrics"]
     assert api_client.get("/api/v1/model/info").json()["feature_count"] == len(FEATURE_COLUMNS)
     invalid = api_client.post("/api/v1/risk/predict", json={"transaction_id": "bad id", "amount": -1})
     assert invalid.status_code == 422 and invalid.json()["code"] == "validation_error"

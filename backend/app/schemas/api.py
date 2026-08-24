@@ -122,6 +122,52 @@ class ModelMetricsResponse(BaseModel):
     metrics: dict[str, object]
 
 
+class DashboardKpisResponse(BaseModel):
+    total_transactions: int
+    high_risk: int
+    medium_risk: int
+    predicted_chargebacks: int
+    average_risk_score: float | None
+
+
+class RiskDistributionPointResponse(BaseModel):
+    risk_level: str
+    count: int
+
+
+class RiskScoreBucketResponse(BaseModel):
+    bucket_start: int
+    bucket_end: int
+    count: int
+
+
+class TransactionVolumePointResponse(BaseModel):
+    date: str
+    count: int
+
+
+class RecentHighRiskCaseResponse(BaseModel):
+    transaction_id: str
+    risk_score: float
+    risk_level: str
+    model_version: str
+    predicted_at: datetime
+    amount: Decimal
+    currency: str
+    status: str
+
+
+class DashboardAnalyticsResponse(BaseModel):
+    generated_at: datetime
+    synthetic_data: Literal[True]
+    kpis: DashboardKpisResponse
+    risk_distribution: list[RiskDistributionPointResponse]
+    risk_score_histogram: list[RiskScoreBucketResponse]
+    transaction_volume_trend: list[TransactionVolumePointResponse]
+    model_metrics: ModelMetricsResponse
+    recent_high_risk_cases: list[RecentHighRiskCaseResponse]
+
+
 class ModelInfoResponse(BaseModel):
     model_version: str
     model_type: str

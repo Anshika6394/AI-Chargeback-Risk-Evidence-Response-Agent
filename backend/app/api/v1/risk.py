@@ -1,6 +1,7 @@
 """Risk prediction, summary, and persisted model metadata endpoints."""
 
 import json
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Any
@@ -15,7 +16,7 @@ from app.ml.features import FEATURE_COLUMNS
 from app.ml.prediction import predict_risk
 from app.models.risk_prediction import RiskPrediction
 from app.models.transaction import Transaction
-from app.schemas.api import ModelInfoResponse, ModelMetricsResponse, RiskPredictRequest, RiskPredictResponse, RiskSummaryResponse
+from app.schemas.api import DashboardAnalyticsResponse, DashboardKpisResponse, ModelInfoResponse, ModelMetricsResponse, RecentHighRiskCaseResponse, RiskDistributionPointResponse, RiskPredictRequest, RiskPredictResponse, RiskScoreBucketResponse, RiskSummaryResponse, TransactionVolumePointResponse
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 model_router = APIRouter(prefix="/model", tags=["model"])
@@ -54,6 +55,54 @@ def predict(
     return RiskPredictResponse(prediction_id=record.id, transaction_id=transaction.transaction_id, probability=result.probability, risk_score=result.risk_score, risk_level=result.risk_level, model_version=result.model_version, model_derived_risk_factors=[factor.__dict__ for factor in result.model_derived_risk_factors])
 
 
+def _metrics_response(settings: Settings) -> ModelMetricsResponse:
+    payload = _artifact_payload(settings, ".evaluation.json")
+    return ModelMetricsResponse(model_version=payload["model_version"], model_type=payload["model_type"], dataset_version=payload["dataset_version"], evaluated_at=payload["evaluated_at"], metrics=payload["metrics"])
+
+
+def _score_bucket(score_percent: float) -> tuple[int, int]:
+    start = min(int(score_percent // 10) * 10, 90)
+    return start, start + 10
+
+
+@router.get("/dashboard", response_model=DashboardAnalyticsResponse, summary="Get live risk operations dashboard analytics")
+def risk_dashboard(db: Annotated[Session, Depends(get_db)], settings: Annotated[Settings, Depends(get_settings)]) -> DashboardAnalyticsResponse:
+    """Return presentation dashboard data from DB aggregates and persisted held-out metrics only."""
+    total_transactions = db.scalar(select(func.count()).select_from(Transaction)) or 0
+    total_predictions = db.scalar(select(func.count()).select_from(RiskPrediction)) or 0
+    average = db.scalar(select(func.avg(RiskPrediction.risk_score)))
+    grouped = db.execute(select(RiskPrediction.risk_band, func.count()).group_by(RiskPrediction.risk_band)).all()
+    risk_counts = {band: int(count) for band, count in grouped}
+    histogram_counts = {(start, start + 10): 0 for start in range(0, 100, 10)}
+    for (score,) in db.execute(select(RiskPrediction.risk_score)).all():
+        bucket = _score_bucket(float(score) * 100)
+        histogram_counts[bucket] += 1
+    trend_rows = db.execute(select(func.date(Transaction.created_at), func.count()).group_by(func.date(Transaction.created_at)).order_by(func.date(Transaction.created_at))).all()
+    recent_rows = db.execute(
+        select(RiskPrediction, Transaction)
+        .join(Transaction, RiskPrediction.transaction_id == Transaction.id)
+        .where(RiskPrediction.risk_band == "HIGH")
+        .order_by(RiskPrediction.created_at.desc())
+        .limit(10)
+    ).all()
+    return DashboardAnalyticsResponse(
+        generated_at=datetime.now(UTC),
+        synthetic_data=True,
+        kpis=DashboardKpisResponse(
+            total_transactions=total_transactions,
+            high_risk=risk_counts.get("HIGH", 0),
+            medium_risk=risk_counts.get("MEDIUM", 0),
+            predicted_chargebacks=total_predictions,
+            average_risk_score=float(average * 100) if average is not None else None,
+        ),
+        risk_distribution=[RiskDistributionPointResponse(risk_level=band, count=count) for band, count in sorted(risk_counts.items())],
+        risk_score_histogram=[RiskScoreBucketResponse(bucket_start=start, bucket_end=end, count=count) for (start, end), count in histogram_counts.items()],
+        transaction_volume_trend=[TransactionVolumePointResponse(date=str(day), count=int(count)) for day, count in trend_rows],
+        model_metrics=_metrics_response(settings),
+        recent_high_risk_cases=[RecentHighRiskCaseResponse(transaction_id=txn.transaction_id, risk_score=float(pred.risk_score) * 100, risk_level=pred.risk_band, model_version=pred.model_version, predicted_at=pred.created_at, amount=txn.amount, currency=txn.currency, status=txn.status) for pred, txn in recent_rows],
+    )
+
+
 @router.get("/summary", response_model=RiskSummaryResponse, summary="Get database-derived risk summary")
 def risk_summary(db: Annotated[Session, Depends(get_db)]) -> RiskSummaryResponse:
     """Return aggregate counts calculated from stored transactions and prediction audit records."""
@@ -67,8 +116,7 @@ def risk_summary(db: Annotated[Session, Depends(get_db)]) -> RiskSummaryResponse
 @model_router.get("/metrics", response_model=ModelMetricsResponse, summary="Get actual held-out evaluation metrics")
 def model_metrics(settings: Annotated[Settings, Depends(get_settings)]) -> ModelMetricsResponse:
     """Expose the persisted Phase 4 evaluation JSON, never hard-coded performance values."""
-    payload = _artifact_payload(settings, ".evaluation.json")
-    return ModelMetricsResponse(model_version=payload["model_version"], model_type=payload["model_type"], dataset_version=payload["dataset_version"], evaluated_at=payload["evaluated_at"], metrics=payload["metrics"])
+    return _metrics_response(settings)
 
 
 @model_router.get("/info", response_model=ModelInfoResponse, summary="Get persisted model metadata")
