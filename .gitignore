@@ -39,3 +39,6 @@ Thumbs.db
 *.sqlite3
 *.db
 *.log
+
+# Locally generated ML artifacts
+artifacts/

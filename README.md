@@ -2,7 +2,7 @@
 
 A synthetic/demo fintech risk-operations application for the Razorpay AI Builder Internship 2026 — Track 02: AI Risk Manager.
 
-## Current phase: Phase 13 — UI Polish, Documentation & Demo Preparation
+## Current phase: Phase 14 — Final Submission Verification & Release
 
 The application combines a backend ML chargeback-risk model with a backend-only Gemini investigation agent. The ML model performs quantitative risk prediction; Gemini performs bounded investigation and evidence synthesis using backend tools. The system never executes financial actions: recommendations always require human approval.
 
@@ -15,6 +15,8 @@ The application combines a backend ML chargeback-risk model with a backend-only 
 - [Agent/tool workflow diagram](docs/agent-workflow.md)
 - [Five-minute demo script](docs/demo-script.md)
 - [Evaluator Q&A notes](docs/evaluator-qa.md)
+- [Final submission checklist](docs/final-submission-checklist.md)
+- [Five-minute pitch outline](docs/final-pitch-outline.md)
 
 ## Screenshots
 
@@ -127,7 +129,7 @@ python -m app.ml.train_model
 cat artifacts/models/chargeback-risk-v1.evaluation.json
 ```
 
-At the time of this Phase 13 update, no evaluation artifact is committed in `backend/artifacts/models/`, so this README intentionally does not claim numeric precision, recall, F1, accuracy, ROC-AUC, or confusion-matrix values. The UI reads metrics from `/api/v1/model/metrics`, which is backed by the persisted evaluation JSON.
+Evaluation artifacts are generated locally and are intentionally not committed. This README therefore does not claim numeric precision, recall, F1, accuracy, ROC-AUC, or confusion-matrix values. The UI reads metrics from `/api/v1/model/metrics`, which is backed by the persisted evaluation JSON.
 
 ## Synthetic dataset limitations
 
