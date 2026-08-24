@@ -194,3 +194,43 @@ class InvestigationResponse(BaseModel):
     recommendation: Literal["MANUAL_REVIEW", "GATHER_MORE_EVIDENCE", "CONTEST_DISPUTE"]
     confidence: float = Field(ge=0, le=1)
     requires_human_review: Literal[True]
+
+
+RecommendationCategory = Literal[
+    "MANUAL_REVIEW",
+    "MONITOR",
+    "REQUEST_ADDITIONAL_VERIFICATION",
+    "PRIORITIZE_CHARGEBACK_RESPONSE",
+    "PREPARE_EVIDENCE_PACKAGE",
+    "LOW_PRIORITY_REVIEW",
+]
+
+
+class EvidenceClaimResponse(BaseModel):
+    content: str
+    source: str
+    source_id: str
+
+
+class EvidencePackageResponse(BaseModel):
+    case_id: str
+    package_id: str
+    version: int
+    generated_at: datetime
+    transaction_evidence: list[EvidenceClaimResponse]
+    customer_history: list[EvidenceClaimResponse]
+    previous_disputes: list[EvidenceClaimResponse]
+    risk_analysis: list[EvidenceClaimResponse]
+    recommended_response: RecommendationCategory
+
+
+class RecommendationResponse(BaseModel):
+    case_id: str
+    recommendation_id: str
+    evidence_package_id: str
+    version: int
+    generated_at: datetime
+    category: RecommendationCategory
+    rationale: str
+    human_approval_required: Literal[True]
+    financial_action_executed: Literal[False]

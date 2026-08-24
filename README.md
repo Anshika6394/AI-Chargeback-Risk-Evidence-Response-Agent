@@ -2,9 +2,9 @@
 
 A synthetic/demo fintech risk-operations application for the Razorpay AI Builder Internship 2026 — Track 02: AI Risk Manager.
 
-## Current phase: Phase 7 — Gemini Tool-Using Investigation Agent
+## Current phase: Phase 8 — Evidence Response Package & Bounded Recommendation
 
-Earlier phases added the backend foundation for environment-based configuration, database wiring, ORM domain models, separate Pydantic schemas, consistent API error responses, and seed-data scaffolding. Phase 7 adds a backend-only, tool-using Gemini investigation layer; it does **not** include authentication, dashboard workflows, or autonomous financial actions.
+Earlier phases added the backend foundation, ML risk prediction, traceable investigation cases, and a backend-only Gemini investigation layer. Phase 8 adds versioned evidence packages and non-executing recommendations for human reviewers; it does **not** include authentication, dashboard workflows, or autonomous financial actions.
 
 All data in this repository is intended for synthetic/demo development only. Real secrets must stay in environment variables and must never be committed.
 
@@ -216,6 +216,14 @@ It writes these reproducible, machine-readable/auditable artifacts under `backen
 `predict_risk(..., top_n_factors=5)` now returns `model_derived_risk_factors`. Tree classifiers use their model-native feature importances and linear classifiers use coefficients, combined with the exact transformed input values. These factors are traceable to the feature schema and are deliberately separate from any future Gemini-generated narrative.
 
 All Phase 4 metrics and explanations are derived from the synthetic demo dataset and persisted scikit-learn pipeline; they are not production performance claims or LLM output.
+
+### Phase 8 — Evidence Response Package & Bounded Recommendation
+
+`POST /api/v1/cases/{case_id}/investigate` remains the controlled, backend-only Gemini investigation trigger. A successful investigation advances a case from `NEW` to `INVESTIGATING`; Gemini failures leave the case unchanged.
+
+While a case is `INVESTIGATING`, `POST /api/v1/cases/{case_id}/evidence` creates an immutable, versioned reviewer package. It includes transaction evidence, database-derived customer transaction history, prior disputes, the independently stored ML prediction and its actual model-derived factors, and a bounded proposed response. Every claim includes its database source table and record ID; unavailable data is represented as `Evidence unavailable`. Repeating the endpoint produces a newer snapshot so reviewers can regenerate after available evidence changes.
+
+`POST /api/v1/cases/{case_id}/recommendation` requires a generated package and stores a versioned recommendation tied to its source package. Its categories are limited to `MANUAL_REVIEW`, `MONITOR`, `REQUEST_ADDITIONAL_VERIFICATION`, `PRIORITIZE_CHARGEBACK_RESPONSE`, `PREPARE_EVIDENCE_PACKAGE`, and `LOW_PRIORITY_REVIEW`. Every response prominently returns `human_approval_required: true` and `financial_action_executed: false`. The response workflow performs only evidence/recommendation persistence and reviewer case-status updates; it has no refund, reversal, transfer, account-closure, or payment-network submission capability.
 
 ### Phase 6: risk investigation cases and evidence traceability
 

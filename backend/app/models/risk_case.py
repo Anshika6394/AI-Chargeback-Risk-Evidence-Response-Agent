@@ -34,6 +34,8 @@ class RiskCase(IdTimestampMixin, Base):
     evidence_items = relationship("EvidenceItem", back_populates="risk_case", cascade="all, delete-orphan")
     history_entries = relationship("RiskCaseHistory", back_populates="risk_case", cascade="all, delete-orphan")
     investigations = relationship("AgentInvestigation", back_populates="risk_case", cascade="all, delete-orphan")
+    evidence_packages = relationship("EvidencePackage", back_populates="risk_case", cascade="all, delete-orphan")
+    recommendations = relationship("CaseRecommendation", back_populates="risk_case", cascade="all, delete-orphan")
 
 
 class EvidenceItem(IdTimestampMixin, Base):
@@ -82,3 +84,34 @@ class AgentInvestigation(IdTimestampMixin, Base):
     result_json: Mapped[str] = mapped_column(Text, nullable=False)
 
     risk_case = relationship("RiskCase", back_populates="investigations")
+
+
+class EvidencePackage(IdTimestampMixin, Base):
+    """An immutable, versioned reviewer package assembled from verified facts."""
+
+    __tablename__ = "evidence_packages"
+    __table_args__ = (Index("ix_evidence_packages_risk_case_id", "risk_case_id"),)
+
+    risk_case_id: Mapped[str] = mapped_column(ForeignKey("risk_cases.id"), nullable=False)
+    version: Mapped[int] = mapped_column(nullable=False)
+    content_json: Mapped[str] = mapped_column(Text, nullable=False)
+    source_references_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+    risk_case = relationship("RiskCase", back_populates="evidence_packages")
+
+
+class CaseRecommendation(IdTimestampMixin, Base):
+    """A non-executing, versioned recommendation for explicit human approval."""
+
+    __tablename__ = "case_recommendations"
+    __table_args__ = (Index("ix_case_recommendations_risk_case_id", "risk_case_id"),)
+
+    risk_case_id: Mapped[str] = mapped_column(ForeignKey("risk_cases.id"), nullable=False)
+    evidence_package_id: Mapped[str] = mapped_column(ForeignKey("evidence_packages.id"), nullable=False)
+    version: Mapped[int] = mapped_column(nullable=False)
+    category: Mapped[str] = mapped_column(String(80), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    requires_human_approval: Mapped[bool] = mapped_column(nullable=False, default=True)
+
+    risk_case = relationship("RiskCase", back_populates="recommendations")
+    evidence_package = relationship("EvidencePackage")

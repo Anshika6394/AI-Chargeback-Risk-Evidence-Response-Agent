@@ -16,6 +16,8 @@ def test_database_initializes_with_expected_tables_indexes_and_foreign_keys() ->
 
     inspector = inspect(engine)
     assert set(inspector.get_table_names()) == {
+        "agent_investigations",
+        "case_recommendations",
         "customers",
         "devices",
         "disputes",
@@ -24,6 +26,7 @@ def test_database_initializes_with_expected_tables_indexes_and_foreign_keys() ->
         "risk_cases",
         "risk_case_history",
         "evidence_items",
+        "evidence_packages",
         "transactions",
     }
 
