@@ -18,7 +18,8 @@ router = APIRouter(prefix="/customers", tags=["customers"])
 
 def _customer_or_404(db: Session, customer_id: str) -> Customer:
     customer = db.get(Customer, customer_id)
-    if customer is None: raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
+    if customer is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
     return customer
 
 

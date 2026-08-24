@@ -2,9 +2,9 @@
 
 A synthetic/demo fintech risk-operations application for the Razorpay AI Builder Internship 2026 — Track 02: AI Risk Manager.
 
-## Current phase: Phase 8 — Evidence Response Package & Bounded Recommendation
+## Current phase: Phase 12 — Security, Testing & Reliability Hardening
 
-Earlier phases added the backend foundation, ML risk prediction, traceable investigation cases, and a backend-only Gemini investigation layer. Phase 8 adds versioned evidence packages and non-executing recommendations for human reviewers; it does **not** include authentication, dashboard workflows, or autonomous financial actions.
+Earlier phases added the backend foundation, ML risk prediction, traceable investigation cases, a backend-only Gemini investigation layer, frontend reviewer workflows, and versioned evidence packages with non-executing recommendations. Phase 12 hardens CORS validation, structured request logging, bounded Gemini retries, and regression/integration test coverage; it does **not** include authentication or autonomous financial actions.
 
 All data in this repository is intended for synthetic/demo development only. Real secrets must stay in environment variables and must never be committed.
 
@@ -64,6 +64,7 @@ Supported backend environment variables:
 | `GEMINI_API_KEY` | Backend-only Gemini key used only by the Phase 7 investigation service. | empty |
 | `GEMINI_MODEL` | Backend-only Gemini model used for controlled investigations. | `gemini-2.5-flash` |
 | `GEMINI_TIMEOUT_SECONDS` | Maximum duration for a Gemini request. | `20` |
+| `GEMINI_MAX_RETRIES` | Bounded safe retries for transient Gemini investigation failures. | `1` |
 | `BACKEND_CORS_ORIGINS` | Comma-separated allowed frontend origins | `http://localhost:5173` |
 | `VITE_API_BASE_URL` | Frontend development API base URL | `http://localhost:8000` |
 
@@ -154,9 +155,8 @@ npm run build
 ## Current limitations
 
 - No authentication yet.
-- No Gemini investigation agent yet.
-- No Gemini investigation agent yet.
-- No financial actions of any kind.
+- Gemini investigations require a backend-only `GEMINI_API_KEY`; ML prediction remains available when Gemini is unavailable.
+- No financial actions of any kind. Recommendations always require human approval.
 
 All future evidence and metrics must come from real tool/database/model output in later phases.
 

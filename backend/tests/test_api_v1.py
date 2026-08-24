@@ -30,8 +30,10 @@ def api_client(tmp_path: Path) -> TestClient:
 
     def override_db():
         db = SessionLocal()
-        try: yield db
-        finally: db.close()
+        try:
+            yield db
+        finally:
+            db.close()
 
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[get_settings] = lambda: Settings(database_url=f"sqlite:///{tmp_path}/api.db", ml_model_artifact_path=str(training.artifact_path))
