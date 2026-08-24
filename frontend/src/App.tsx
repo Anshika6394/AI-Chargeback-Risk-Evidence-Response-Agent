@@ -1,46 +1,5 @@
-import { useEffect, useState } from 'react';
-
-type HealthStatus = 'checking' | 'online' | 'offline';
-
-function App() {
-  const [healthStatus, setHealthStatus] = useState<HealthStatus>('checking');
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function checkBackendHealth() {
-      try {
-        const response = await fetch('/api/v1/health');
-        if (!isMounted) return;
-        setHealthStatus(response.ok ? 'online' : 'offline');
-      } catch {
-        if (!isMounted) return;
-        setHealthStatus('offline');
-      }
-    }
-
-    void checkBackendHealth();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  return (
-    <main className="dashboard-shell">
-      <section className="hero-card" aria-labelledby="page-title">
-        <p className="eyebrow">Synthetic demo foundation · Phase 0</p>
-        <h1 id="page-title">AI Chargeback Risk & Evidence Response Agent</h1>
-        <p className="summary">
-          A safe starting dashboard for a fintech risk-operations product. The ML model,
-          Gemini investigation agent, evidence tools, and financial recommendations will be added in later phases.
-        </p>
-        <div className={`status-pill status-pill--${healthStatus}`}>
-          Backend health: {healthStatus}
-        </div>
-      </section>
-    </main>
-  );
-}
-
-export default App;
+import { useEffect, useState, type ReactNode } from 'react';
+import { Dashboard } from './routes/Dashboard'; import { Transactions } from './routes/Transactions'; import { Cases } from './routes/Cases'; import { ModelMetrics } from './routes/ModelMetrics'; import { SettingsHealth } from './routes/SettingsHealth';
+const routes: Record<string, { label: string; content: ReactNode }> = { '/': { label: 'Dashboard', content: <Dashboard /> }, '/transactions': { label: 'Transactions', content: <Transactions /> }, '/cases': { label: 'Cases', content: <Cases /> }, '/model-metrics': { label: 'Model Metrics', content: <ModelMetrics /> }, '/settings': { label: 'Settings & Health', content: <SettingsHealth /> } };
+function currentPath() { return routes[window.location.pathname] ? window.location.pathname : '/'; }
+export default function App() { const [path, setPath] = useState(currentPath); useEffect(() => { const update = () => setPath(currentPath()); window.addEventListener('popstate', update); return () => window.removeEventListener('popstate', update); }, []); const navigate = (next: string) => { window.history.pushState({}, '', next); setPath(next); window.scrollTo({ top: 0 }); }; return <div className="app-shell"><a className="skip-link" href="#main-content">Skip to main content</a><aside className="sidebar"><div className="brand"><span aria-hidden="true">◈</span><div><strong>RiskOps</strong><small>AI Chargeback</small></div></div><nav aria-label="Primary navigation">{Object.entries(routes).map(([route, item]) => <button key={route} className={path === route ? 'nav-link nav-link--active' : 'nav-link'} aria-current={path === route ? 'page' : undefined} onClick={() => navigate(route)}>{item.label}</button>)}</nav><p className="sidebar-note">Synthetic demo environment<br />Human decisions required</p></aside><main id="main-content" className="content">{routes[path].content}</main></div>; }

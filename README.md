@@ -133,7 +133,7 @@ Frontend URL:
 
 - Dashboard shell: <http://localhost:5173>
 
-The frontend uses Vite's development proxy so browser requests to `/api/v1/health` are forwarded to the backend at `http://localhost:8000`.
+The Phase 9 frontend provides Dashboard, Transactions, Cases, Model Metrics, and Settings & Health routes. It uses `VITE_API_BASE_URL` when supplied; otherwise Vite's development proxy forwards `/api` requests to `http://localhost:8000`. Dashboard, transactions, health, and model views display only API-derived data and explicit loading, empty, and error states.
 
 ## Tests and checks
 
