@@ -72,7 +72,6 @@ def _add_curated_demo_cases(
         Customer(id=_demo_id("customer", "repeat"), email="demo.repeat.disputes@synthetic.example.test", full_name="Synthetic Repeat Dispute Buyer", country="SG"),
     ]
     customers.extend(demo_customers)
-    db.add_all(demo_customers)
 
     demo_merchants = [
         Merchant(id=_demo_id("merchant", "trusted"), name="synthetic_demo_trusted_books", category="digital_goods", country="IN"),
@@ -81,7 +80,6 @@ def _add_curated_demo_cases(
         Merchant(id=_demo_id("merchant", "gaming"), name="synthetic_demo_instant_gaming", category="gaming", country="AE"),
     ]
     merchants.extend(demo_merchants)
-    db.add_all(demo_merchants)
 
     demo_devices = [
         Device(id=_demo_id("device", "low"), customer_id=demo_customers[0].id, fingerprint="synthetic_demo_low_known_device", ip_address="10.10.1.11", user_agent="SyntheticDemo/low-risk"),
@@ -90,7 +88,6 @@ def _add_curated_demo_cases(
         Device(id=_demo_id("device", "repeat"), customer_id=demo_customers[3].id, fingerprint="synthetic_demo_repeat_dispute_device", ip_address="10.40.4.44", user_agent="SyntheticDemo/repeat-dispute"),
     ]
     devices.extend(demo_devices)
-    db.add_all(demo_devices)
 
     demo_transactions = [
         Transaction(id=_demo_id("transaction", "low"), transaction_id="TX-DEMO-LOW-001", customer_id=demo_customers[0].id, merchant_id=demo_merchants[0].id, device_id=demo_devices[0].id, amount=Decimal("18.99"), currency="INR", status="settled"),
@@ -102,7 +99,6 @@ def _add_curated_demo_cases(
         Transaction(id=_demo_id("transaction", "hero"), transaction_id="TX-DEMO-001", customer_id=demo_customers[3].id, merchant_id=demo_merchants[2].id, device_id=demo_devices[3].id, amount=Decimal("1240.00"), currency="SGD", status="failed"),
     ]
     transactions.extend(demo_transactions)
-    db.add_all(demo_transactions)
 
     demo_disputes = [
         Dispute(id=_demo_id("dispute", "high"), transaction_id=demo_transactions[2].id, customer_id=demo_transactions[2].customer_id, reason_code="synthetic_demo_fraudulent", status="open", evidence_summary="Synthetic high-risk demo dispute. Not real customer, transaction, or evidence data."),
@@ -111,7 +107,17 @@ def _add_curated_demo_cases(
         Dispute(id=_demo_id("dispute", "hero"), transaction_id=demo_transactions[6].id, customer_id=demo_transactions[6].customer_id, reason_code="synthetic_demo_fraudulent", status="open", evidence_summary="Synthetic hero demo dispute with high amount, failed status, cross-border merchant, and prior customer disputes."),
     ]
     disputes.extend(demo_disputes)
-    db.add_all(demo_disputes)
+
+
+def _upsert_all(db: Session, records: list[object]) -> None:
+    """Persist deterministic seed rows by their stable primary keys.
+
+    The seed dataset owns these IDs, so merging them updates an earlier version
+    of the same synthetic row while leaving every unrelated row untouched.
+    """
+    for record in records:
+        db.merge(record)
+
 
 def seed_synthetic(db: Session) -> SeedSummary:
     fake = Faker()
@@ -129,7 +135,6 @@ def seed_synthetic(db: Session) -> SeedSummary:
             full_name=f"{first} {last}",
             country=country,
         ))
-    db.add_all(customers)
 
     merchants: list[Merchant] = []
     for index in range(MERCHANT_COUNT):
@@ -139,7 +144,6 @@ def seed_synthetic(db: Session) -> SeedSummary:
             category=MERCHANT_CATEGORIES[index % len(MERCHANT_CATEGORIES)],
             country=COUNTRIES[index % len(COUNTRIES)],
         ))
-    db.add_all(merchants)
 
     devices: list[Device] = []
     for index in range(DEVICE_COUNT):
@@ -151,7 +155,6 @@ def seed_synthetic(db: Session) -> SeedSummary:
             ip_address=fake.ipv4(),
             user_agent=fake.user_agent(),
         ))
-    db.add_all(devices)
 
     high_risk_count = int(TRANSACTION_COUNT * 0.135)
     transactions: list[Transaction] = []
@@ -176,7 +179,6 @@ def seed_synthetic(db: Session) -> SeedSummary:
         transactions.append(t)
         if is_high_risk:
             high_risk_transactions.append(t)
-    db.add_all(transactions)
 
     disputes: list[Dispute] = []
     for index, txn in enumerate(high_risk_transactions):
@@ -188,9 +190,12 @@ def seed_synthetic(db: Session) -> SeedSummary:
             status=rng.choice(["open", "under_review", "won", "lost"]),
             evidence_summary="Synthetic dispute. Not real customer, transaction, or evidence data.",
         ))
-    db.add_all(disputes)
-
     _add_curated_demo_cases(db, customers, merchants, devices, transactions, disputes)
+    _upsert_all(db, customers)
+    _upsert_all(db, merchants)
+    _upsert_all(db, devices)
+    _upsert_all(db, transactions)
+    _upsert_all(db, disputes)
     db.commit()
 
     counts: SeedSummary = {
