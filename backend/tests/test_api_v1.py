@@ -80,3 +80,15 @@ def test_data_routes_metrics_metadata_validation_and_openapi(api_client: TestCli
     assert invalid.status_code == 422 and invalid.json()["code"] == "validation_error"
     paths = api_client.get("/openapi.json").json()["paths"]
     assert {"/api/v1/risk/predict", "/api/v1/transactions", "/api/v1/model/metrics"} <= set(paths)
+
+
+def test_transactions_support_search_status_and_sort(api_client: TestClient) -> None:
+    response = api_client.get("/api/v1/transactions", params={"search": "synthetic_phase2_txn_0000", "sort_by": "amount", "sort_dir": "asc"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["transaction_id"] == "synthetic_phase2_txn_0000"
+
+    failed = api_client.get("/api/v1/transactions", params={"status": "failed", "sort_by": "status", "sort_dir": "desc"})
+    assert failed.status_code == 200
+    assert all(item["status"] == "failed" for item in failed.json()["items"])
