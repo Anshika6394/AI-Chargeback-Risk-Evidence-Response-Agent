@@ -14,6 +14,8 @@ from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.db.init_db import init_db
+from app.db.session import SessionLocal
+from app.seed.scaffold import seed_synthetic_demo_data
 
 logger = logging.getLogger("app.request")
 
@@ -43,6 +45,16 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     init_db()
+    settings = get_settings()
+
+    if settings.seed_demo_data:
+        db = SessionLocal()
+        try:
+            counts = seed_synthetic_demo_data(db)
+            logger.info("Demo seed completed: %s", counts)
+        finally:
+            db.close()
+
     yield
 
 

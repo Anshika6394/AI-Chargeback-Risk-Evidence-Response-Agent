@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     app_name: str = "AI Chargeback Risk & Evidence Response Agent"
     app_env: Literal["development", "test", "production"] = "development"
+    seed_demo_data: bool = False
     database_url: str = "sqlite:///./chargeback_risk.db"
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
